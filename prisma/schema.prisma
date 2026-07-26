@@ -10,3 +10,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Placeholder model required for Prisma Client generation
+model FoundationPlaceholder {
+  id String @id @default(uuid())
+}
