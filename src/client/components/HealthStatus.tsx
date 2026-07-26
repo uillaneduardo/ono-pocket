@@ -3,11 +3,10 @@ import { Activity, CheckCircle, AlertCircle, RefreshCw, Server, Clock } from 'lu
 
 interface HealthData {
   status: string;
-  app: string;
-  version: string;
-  timestamp: string;
+  service: string;
+  serverTime: string;
   uptime: number;
-  environment: string;
+  environment?: string;
 }
 
 export const HealthStatus: React.FC = () => {
@@ -19,7 +18,8 @@ export const HealthStatus: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/health');
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/health`);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
@@ -54,7 +54,7 @@ export const HealthStatus: React.FC = () => {
       </div>
 
       {loading && !data ? (
-        <div className="py-6 text-center text-sm text-slate-400">Verificando endpoint /health...</div>
+        <div className="py-6 text-center text-sm text-slate-400">Verificando endpoint /api/health...</div>
       ) : error ? (
         <div className="flex items-center space-x-3 p-4 bg-red-950/40 border border-red-900/50 rounded-lg text-red-300 text-sm">
           <AlertCircle className="h-5 w-5 shrink-0 text-red-400" />
@@ -64,7 +64,7 @@ export const HealthStatus: React.FC = () => {
           </div>
         </div>
       ) : data ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
           <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/60">
             <div className="flex items-center space-x-2 text-slate-400 mb-1">
               <CheckCircle className="h-4 w-4 text-emerald-400" />
@@ -76,9 +76,9 @@ export const HealthStatus: React.FC = () => {
           <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/60">
             <div className="flex items-center space-x-2 text-slate-400 mb-1">
               <Server className="h-4 w-4 text-teal-400" />
-              <span>Ambiente</span>
+              <span>Serviço</span>
             </div>
-            <span className="text-sm font-semibold text-slate-200">{data.environment}</span>
+            <span className="text-sm font-semibold text-slate-200">{data.service}</span>
           </div>
 
           <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/60">
@@ -87,6 +87,16 @@ export const HealthStatus: React.FC = () => {
               <span>Uptime</span>
             </div>
             <span className="text-sm font-semibold text-slate-200">{Math.floor(data.uptime)}s</span>
+          </div>
+
+          <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/60">
+            <div className="flex items-center space-x-2 text-slate-400 mb-1">
+              <Clock className="h-4 w-4 text-indigo-400" />
+              <span>Horário</span>
+            </div>
+            <span className="text-sm font-semibold text-slate-200" title={data.serverTime}>
+              {new Date(data.serverTime).toLocaleTimeString()}
+            </span>
           </div>
         </div>
       ) : null}

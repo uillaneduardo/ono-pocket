@@ -6,13 +6,18 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server/index.ts",
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:web": "vite",
     "build": "vite build --outDir dist/client && tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
     "test": "vitest run",
+    "test:integration": "vitest run tests/integration",
     "test:watch": "vitest",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "prisma:generate": "prisma generate",
+    "db:generate": "prisma generate || echo 'No models defined yet'",
+    "db:migrate": "prisma migrate dev",
+    "prisma:generate": "prisma generate || echo 'No models defined yet'",
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {

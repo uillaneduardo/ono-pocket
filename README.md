@@ -57,15 +57,38 @@ npm install
 ```
 
 ### Desenvolvimento
+O comando principal para desenvolvimento é:
 ```bash
-# Executa servidor em modo watch (Frontend + REST API na porta 3000)
+# Inicia a aplicação integrada (Backend Express + Frontend Vite na porta 3000)
 npm run dev
+```
+> **Como funciona:** O script `npm run dev` executa o servidor Node.js/Express (`src/server/index.ts`) em modo watch com `tsx`. Em modo de desenvolvimento, o Express carrega o middleware do Vite (`vite.createServer`), processando o frontend React/Vite e servindo as rotas `/api/*` da REST API simultaneamente na mesma porta (3000).
+
+Também estão disponíveis scripts individuais de desenvolvimento:
+```bash
+# Executa apenas o servidor backend Express
+npm run dev:server
+
+# Executa apenas o servidor Vite para o frontend
+npm run dev:web
+```
+
+### Banco de Dados (Prisma ORM)
+```bash
+# Gera o cliente do Prisma ORM
+npm run db:generate
+
+# Executa as migrações do banco em desenvolvimento
+npm run db:migrate
 ```
 
 ### Testes Automatizados
 ```bash
-# Executa os testes unitários da API REST com Vitest
+# Executa os testes unitários com Vitest
 npm run test
+
+# Executa os testes de integração com Vitest
+npm run test:integration
 ```
 
 ### Linter & Checagem de Tipos

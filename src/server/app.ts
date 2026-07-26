@@ -10,7 +10,8 @@ const __dirname = path.dirname(__filename);
 export function createApp(): Express {
   const app = express();
 
-  app.use(cors());
+  const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:3000';
+  app.use(cors({ origin: webOrigin }));
   app.use(express.json());
 
   // Health check routes

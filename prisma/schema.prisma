@@ -10,12 +10,3 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// System Health / Log table for foundation check
-model SystemHealth {
-  id        String   @id @default(uuid())
-  status    String   @default("ok")
-  version   String   @default("0.1.0")
-  createdAt DateTime @default(now())
-
-  @@map("system_health")
-}
