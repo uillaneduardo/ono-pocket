@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+bun.lock
+
+# Production build & cache
+dist/
+.vite/
+.cache/
+
+# Environment variables
+.env
+.env*.local
+!.env.example
+
+# Database local files
+prisma/dev.db
+prisma/dev.db-journal
+
+# GitHub Workflows (skipped on push if token lacks workflow scope)
+.github/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE / System
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
