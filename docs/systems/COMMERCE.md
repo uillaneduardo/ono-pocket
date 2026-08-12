@@ -2,52 +2,54 @@
 
 ## 1. Objetivo
 
-Gerenciar a relação entre dinheiro real (BRL) e a aquisição de produtos virtuais ou créditos premium (**PremiumCredits**), suportando cobranças via Pix com integração assíncrona e segura.
+Gerenciar a relação entre dinheiro real (BRL) e produtos digitais do Ono Pocket, incluindo futura aquisição de **PremiumCredits** por Pix, sem misturar processamento de pagamentos com a economia interna do jogo.
 
 ---
 
 ## 2. Responsabilidades
 
-- Oferecer o catálogo de loja e pacotes de créditos premium (`CreditPackages`).
-- Processar a criação de pedidos de pagamento (`PaymentOrders`).
-- Interagir com provedores de pagamento via abstração `PaymentProvider` (ex: Pix).
-- Processar e validar webhooks de pagamento de forma segura e idempotente.
-- Creditar `PremiumCredits` na carteira do jogador exclusivamente após a confirmação server-side do pagamento.
+- Expor catálogo de produtos e pacotes (`CreditPackage`).
+- Criar e acompanhar pedidos (`PaymentOrder`).
+- Integrar provedores de pagamento através de `PaymentProvider`.
+- Processar webhooks de forma autenticada, idempotente e auditável.
+- Confirmar pedidos exclusivamente no servidor.
+- Após pagamento confirmado, solicitar à `Economy` a concessão idempotente de `PremiumCredits`.
+- Registrar estornos e estados de pagamento sem apagar histórico.
+
+Commerce **não** altera diretamente saldos de carteira.
 
 ---
 
 ## 3. Entidades de Domínio
 
 ### CreditPackage
-- `id`: String (ex: `"pack-pix-100"`).
-- `name`: String (ex: `"Pacote de Créditos Inicial"`).
-- `priceBrl`: Integer (Preço em centavos, ex: `1000` = R$ 10,00).
-- `premiumCreditsGranted`: Integer (Quantidade de Créditos Premium concedidos).
+- `id`: String estável.
+- `name`: String.
+- `priceBrlCents`: Integer (`1000` = R$ 10,00).
+- `premiumCreditsGranted`: Integer.
 - `isActive`: Boolean.
+- `version` ou `updatedAt`: usado para auditoria do catálogo.
 
 ### PaymentOrder
-- `id`: UUID (Chave primária).
+- `id`: UUID.
 - `playerId`: UUID.
 - `packageId`: String.
-- `priceBrl`: Integer (Preço no momento do pedido).
-- `creditsToGrant`: Integer.
-- `status`: Enum (`pending`, `paid`, `cancelled`, `refunded`, `expired`).
-- `provider`: String (ex: `"MOCK_PIX"`, `"GERENCIANET"`, `"MERCADOPAGO"`).
-- `providerTransactionId`: String (ID do pagamento no gateway).
-- `pixQrCode`: String (Texto do QR Code Pix / Copia e Cola).
+- `priceBrlCents`: Integer — snapshot do preço no momento da criação.
+- `creditsToGrant`: Integer — snapshot da quantidade prometida.
+- `status`: Enum (`pending`, `paid`, `cancelled`, `refunded`, `expired`, `failed`).
+- `provider`: String.
+- `providerTransactionId`: String único quando disponível.
+- `pixPayload`: String/JSON contendo apenas dados necessários à exibição da cobrança, nunca credenciais.
+- `expiresAt`: DateTime opcional.
 - `createdAt`: DateTime.
-- `paidAt`: DateTime (Opcional).
+- `paidAt`: DateTime opcional.
+- `refundedAt`: DateTime opcional.
 
-### PremiumWallet
-- `playerId`: UUID (Chave primária).
-- `premiumCreditsBalance`: Integer (Saldo de créditos comprados com dinheiro real).
-- `updatedAt`: DateTime.
+`PaymentOrder` preserva o valor e a quantidade de créditos prometidos mesmo que o catálogo seja alterado posteriormente.
 
 ---
 
-## 4. Abstração `PaymentProvider`
-
-Para evitar o acoplamento do Ono Pocket a um gateway de pagamento específico, as integrações de pagamento usam a seguinte interface conceitual no backend:
+## 4. Abstração PaymentProvider
 
 ```typescript
 export interface PaymentProvider {
@@ -58,7 +60,7 @@ export interface PaymentProvider {
   }>;
 
   getCharge(providerTransactionId: string): Promise<{
-    status: 'pending' | 'paid' | 'expired' | 'failed';
+    status: 'pending' | 'paid' | 'expired' | 'failed' | 'refunded';
     paidAt?: Date;
   }>;
 
@@ -67,51 +69,77 @@ export interface PaymentProvider {
     status: 'paid' | 'failed' | 'refunded';
   }>;
 
-  refund(providerTransactionId: string): Promise<boolean>;
+  refund(providerTransactionId: string): Promise<{
+    status: 'requested' | 'refunded' | 'failed';
+  }>;
 }
 ```
 
+A interface é conceitual; detalhes específicos do PSP ficam no adaptador de integração.
+
 ---
 
-## 5. Fluxo Completo de Cobrança Pix
+## 5. Fluxo de Cobrança Pix
 
 ```text
-Jogador              Web Client            Game Server         PaymentProvider (PSP)
-   │                      │                     │                         │
-   │── Seleciona Pacote ─>│                     │                         │
-   │                      │── POST /orders ────>│                         │
-   │                      │   (packageId)       │── createCharge() ──────>│
-   │                      │                     │   (Order Data)          │
-   │                      │                     │<─ QR Code / TxID ───────│
-   │                      │<─ Order Created ────│                         │
-   │                      │   (QR Code Pix)     │                         │
-   │                      │                     │                         │
-   │── Pagamento no Banco ───────────────────────────────────────────────>│
-   │   (via Pix QR Code)  │                     │                         │
-   │                      │                     │<─ Webhook Notification ─│
-   │                      │                     │   (Signed Payload)      │
-   │                      │                     │                         │
-   │                      │                     │── Valida Assinatura/PSP │
-   │                      │                     │── Transação Atômica:    │
-   │                      │                     │   Order -> 'paid'       │
-   │                      │                     │   + PremiumCredits      │
-   │                      │                     │   + Transaction Ledger  │
-   │                      │                     │                         │
-   │<─ Notificação/Status ┼─────────────────────│                         │
+Player / Web Client
+      ↓ packageId
+Game Server / Commerce
+      ↓ cria PaymentOrder com snapshots
+PaymentProvider
+      ↓
+QR Code / Pix Copia e Cola
+      ↓
+Jogador paga
+      ↓
+PSP envia webhook ou API confirma cobrança
+      ↓
+Commerce valida provedor + estado + idempotência
+      ↓
+PaymentOrder = paid
+      ↓
+Economy.grantPremiumCredits(
+  playerId,
+  creditsToGrant,
+  source = PIX_PURCHASE,
+  sourceId = paymentOrderId
+)
+      ↓
+Wallet + Transaction
 ```
 
----
-
-## 6. Regras de Segurança Financeira e Invariantes
-
-1. **Preço Determinado no Servidor:** O preço dos pacotes e a quantidade de créditos a conceder são definidos exclusivamente no backend a partir de `CreditPackage`. O frontend jamais envia preços ou quantidades de créditos.
-2. **Proibição de Confirmação pelo Cliente:** O frontend **NUNCA** informa ao servidor que um pagamento foi concluído. A confirmação ocorre **exclusivamente** via webhook autenticado pelo gateway ou verificação ativa do servidor com o PSP.
-3. **Idempotência Estrita no Webhook:** Um webhook recebido repetidamente para o mesmo `providerTransactionId` não credita `PremiumCredits` mais de uma vez.
-4. **Registros Indeléveis:** Pedidos pagos não são excluídos. Estornos geram um lançamento negativo correspondente no ledger de créditos.
-5. **Segredos e Credenciais:** Chaves de API de provedores Pix e tokens de assinatura de webhook residem estritamente em variáveis de ambiente no servidor e nunca são expostas ao cliente ou versionadas em repositório.
+A atualização do pedido e a concessão econômica devem ser coordenadas de modo que uma repetição do processamento nunca conceda créditos duas vezes.
 
 ---
 
-## 7. Status
+## 6. Regras de Segurança Financeira
 
-- **Maturidade:** Planned (Projetado; sem integração direta de gateway nesta fase).
+1. **Preço determinado no servidor:** cliente envia apenas o identificador do produto/pacote.
+2. **Snapshot do pedido:** preço e créditos são copiados para o pedido no momento da criação.
+3. **Cliente não confirma pagamento:** somente PSP/webhook validado ou verificação ativa server-side pode fazê-lo.
+4. **Idempotência:** `providerTransactionId` e/ou `PaymentOrder.id` impedem processamento duplicado.
+5. **Ledger obrigatório:** concessão e estorno de `PremiumCredits` passam pela Economy.
+6. **Histórico preservado:** pedidos e transações financeiras não são apagados para “corrigir” saldo.
+7. **Segredos server-side:** chaves, tokens, certificados e assinaturas de webhook nunca chegam ao frontend.
+8. **Webhook público, porém autenticado:** caso Cloudflare Access proteja a aplicação, a rota de webhook precisa ser alcançável pelo PSP e protegida pelos mecanismos próprios do provedor, validação de payload, rate limiting e demais controles aplicáveis.
+9. **Valor monetário em inteiros:** BRL é persistido em centavos; evitar `float` para valores financeiros.
+
+---
+
+## 7. Mods e Conteúdo Comunitário
+
+Mods não podem:
+- criar ou confirmar `PaymentOrder`;
+- alterar preços em BRL;
+- chamar `PaymentProvider`;
+- conceder ou retirar `PremiumCredits`;
+- definir produtos pagos sem fluxo administrativo oficial.
+
+Marketplace comunitário pago, repasse a criadores e monetização de mods estão fora do escopo atual.
+
+---
+
+## 8. Status
+
+- **Maturidade:** Planned.
+- Nenhum PSP real deve ser integrado antes de uma SPEC própria de Commerce/Payments e revisão de requisitos legais, fiscais, privacidade e termos aplicáveis.
