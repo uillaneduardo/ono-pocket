@@ -2,83 +2,112 @@
 
 ## 1. Objetivo
 
-Definir a estrutura de domínio, atributos, condições temporárias, fases e comportamento dos **Onos** — os organismos biológicos modulares cultivados e gerenciados pelos jogadores.
+Definir a estrutura persistente, atributos, condições, fases de desenvolvimento e disponibilidade dos **Onos** já formados.
+
+Um Ono é criado ao concluir com sucesso um `Cultivation`. O período anterior à formação pertence ao sistema de Cultivation e não é um estado da entidade Ono.
 
 ---
 
 ## 2. Responsabilidades
 
-- Representar a identidade persistente e estado completo de cada Ono.
-- Manter o registro dos atributos permanentes e condições temporárias do organismo.
-- Armazenar a composição visual em camadas.
-- Garantir as regras de transição de fase e disponibilidade para atividades (trabalho, descanso).
+- Representar a identidade persistente de cada Ono.
+- Manter atributos permanentes e condições temporárias.
+- Preservar os dados gerados originalmente e a composição visual.
+- Controlar fase de desenvolvimento do organismo.
+- Expor sua disponibilidade para atividades sem duplicar o estado transacional dos sistemas de Work, Cultivation ou outros sistemas futuros.
 
 ---
 
-## 3. Entidades de Domínio
+## 3. Entidade Ono
 
-### Ono
-- `id`: UUID (Chave primária).
-- `playerId`: UUID (Chave estrangeira apontando para o proprietário).
-- `seed`: String (Seed usada na geração determinística).
-- `generatorVersion`: String (Versão do gerador usada).
-- `name`: String (Nome dado pelo jogador ou atribuído).
-- `stage`: Enum (`cultivation`, `newborn`, `young`, `adult`).
-- `attributes`: JSON (Atributos permanentes).
-- `conditions`: JSON (Condições temporárias atuais).
-- `predispositions`: JSON (Lista de tendências biológicas).
-- `visualComposition`: JSON (Lista de camadas de componentes visuais).
+- `id`: UUID.
+- `playerId`: UUID do proprietário.
+- `seed`: String.
+- `generatorVersion`: String.
+- `contentVersion`: String/hash que identifica o catálogo/regras usados na geração.
+- `cultivationProtocol`: String/Enum utilizado na geração.
+- `name`: String opcional até a nomeação.
+- `stage`: Enum inicial (`newborn`, `young`, `adult`).
+- `attributes`: dados tipados de atributos permanentes.
+- `conditions`: dados tipados de condições temporárias.
+- `predispositions`: conjunto de predisposições.
+- `visualComposition`: composição persistida em componentes/IDs estáveis.
 - `createdAt`: DateTime.
 - `updatedAt`: DateTime.
 
----
-
-## 4. Atributos Permanentes e Condições Temporárias
-
-### Atributos Permanentes
-- **Força:** Capacidade de transporte e esforço físico.
-- **Mobilidade:** Velocidade e deslocamento.
-- **Sensibilidade:** Percepção de sinais ambientais.
-- **Resistência:** Tolerância a desgaste e condições adversas.
-- **Cognição:** Aprendizado de rotinas e resolução de tarefas.
-- **Autonomia:** Agir com pouca supervisão.
-- **Sociabilidade:** Vínculo e cooperação.
-- **Plasticidade:** Potencial de adaptação.
-
-### Condições Temporárias
-- **Energia:** (0 a 100) Consumida em trabalhos e recuperada com descanso.
-- **Saúde:** (0 a 100) Afetada por acidentes ou maus cuidados.
-- **Estresse:** (0 a 100) Aumentado em tarefas pesadas.
-- **Motivação:** (0 a 100) Influencia bônus de desempenho.
+A implementação física poderá normalizar alguns desses campos em tabelas próprias em vez de JSON. Este documento define o domínio, não o schema final do banco.
 
 ---
 
-## 5. Fases de Desenvolvimento
+## 4. Atributos Permanentes
 
-1. **Cultivo (`cultivation`):** Organismo em formação dentro da incubadora.
-2. **Recém-formado (`newborn`):** Concluído na incubadora, pronto para primeira descoberta e nomeação.
-3. **Jovem (`young`):** Aptidão para realizar os trabalhos iniciais e atividades do laboratório.
-
----
-
-## 6. Regras e Invariantes
-
-1. **Exclusividade de Proprietário:** Um Ono pertence a exatamente um `Player`.
-2. **Exclusividade de Atividade:** Um Ono **NÃO** pode estar simultaneamente em cultivo, disponível e trabalhando.
-3. **Impedimento por Saúde/Energia:** Um Ono com saúde crítica (< 10) ou sem energia (0) não pode ser enviado para trabalhos.
-4. **Imutabilidade Histórica do Gerador:** Alterações no algoritmo de geração não modificam retroativamente os atributos e visual de Onos já criados.
+- **Força:** capacidade de esforço físico.
+- **Mobilidade:** deslocamento e agilidade.
+- **Sensibilidade:** percepção ambiental.
+- **Resistência:** tolerância a desgaste.
+- **Cognição:** aprendizado e resolução de tarefas.
+- **Autonomia:** desempenho com pouca supervisão.
+- **Sociabilidade:** vínculo e cooperação.
+- **Plasticidade:** potencial de adaptação.
 
 ---
 
-## 7. Eventos Produzidos
+## 5. Condições Temporárias
 
-- `OnoCreated(onoId, playerId, seed, generatorVersion)`
+Escala inicial sugerida de 0 a 100:
+- **Energia**
+- **Saúde**
+- **Estresse**
+- **Motivação**
+
+Os valores e limiares concretos pertencem ao `GameConfig` e às regras de cada sistema consumidor.
+
+---
+
+## 6. Fases de Desenvolvimento
+
+- `newborn`: recém-formado e disponível para descoberta/nomeação.
+- `young`: apto às atividades iniciais permitidas.
+- `adult`: fase futura/avançada quando houver mecânicas que justifiquem a transição.
+
+O MVP não deve criar progressão de fase sem função concreta documentada.
+
+---
+
+## 7. Disponibilidade e Ocupação
+
+A fase biológica (`stage`) é diferente de ocupação operacional.
+
+Um Ono pode estar, por exemplo:
+- disponível;
+- trabalhando;
+- descansando/tratando-se futuramente.
+
+A fonte de verdade da ocupação deve ser o sistema que possui a atividade (`WorkAssignment`, tratamento futuro etc.), evitando múltiplos campos contraditórios. Uma visão derivada `availability` pode ser calculada pela API.
+
+Um Ono existente nunca volta ao estado de `Cultivation`; Cultivation cria novos Onos.
+
+---
+
+## 8. Regras e Invariantes
+
+1. Um Ono pertence a exatamente um `Player`.
+2. Um Ono não pode participar simultaneamente de atividades mutuamente exclusivas.
+3. Saúde/energia podem impedir atividades conforme regras do sistema consumidor e `GameConfig`.
+4. Alterações futuras do gerador ou catálogo não modificam retroativamente um Ono persistido.
+5. A composição visual deve referenciar IDs estáveis e manter dados suficientes para continuar renderizável mesmo após evolução do catálogo.
+
+---
+
+## 9. Eventos Produzidos
+
+- `OnoCreated(onoId, playerId, cultivationId, generatorVersion, contentVersion)`
 - `OnoNamed(onoId, newName)`
 - `OnoStageChanged(onoId, oldStage, newStage)`
-- `OnoConditionsUpdated(onoId, newConditions)`
+- `OnoConditionsUpdated(onoId, changes)`
 
 ---
 
-## 8. Status
+## 10. Status
 
 - **Maturidade:** Core / MVP.
