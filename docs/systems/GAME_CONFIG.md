@@ -2,81 +2,135 @@
 
 ## 1. Objetivo
 
-Centralizar a gestão e fornecimento dos parâmetros de balanceamento e configurações do jogo, evitando valores soltos (*magic numbers*) espalhados pelo código.
+Centralizar parâmetros de balanceamento e funcionamento do jogo, evitando *magic numbers* espalhados pelo código e permitindo evolução controlada sem transformar toda configuração em dado administrável desde o início.
 
 ---
 
 ## 2. Responsabilidades
 
-- Fornecer parâmetros padrão de balanceamento para Economia, Cultivo, Trabalho, Onos e Laboratório.
-- Classificar parâmetros entre constantes técnicas, balanceamento e conteúdo administrável.
-- Permitir ajustes dinâmicos e overrides persistidos sem necessidade de recompilar a aplicação.
+- Fornecer parâmetros padrão tipados para Economy, Cultivation, Work, Ono e Laboratory.
+- Separar constantes técnicas, parâmetros de balanceamento e conteúdo administrável.
+- Expor snapshots dos parâmetros relevantes para operações temporais que precisam preservar regras históricas.
+- Futuramente permitir overrides persistidos apenas para chaves explicitamente autorizadas e auditadas.
 
 ---
 
-## 3. Classificação dos Parâmetros
+## 3. Classificação
 
-1. **Constantes Técnicas:** Imutáveis em tempo de execução (ex: `canvasLogicWidth = 64`, `maxLayerOrder = 200`).
-2. **Parâmetros de Balanceamento:** Ajustáveis para refinar o jogo (ex: `economy.initialBalance = 200`, `work.energyCostMultiplier = 1.0`).
-3. **Conteúdo Administrável:** Definições de catálogo que podem ser editadas pelo Game Admin (ex: tabelas de preços, pacotes de créditos).
+### Constantes técnicas
+Fazem parte da implementação e não são alteráveis pelo Game Admin em tempo de execução.
+
+Exemplos:
+- formatos de IDs;
+- versões de schema;
+- limites estruturais necessários à integridade;
+- dimensões lógicas do renderer quando forem invariantes da versão.
+
+### Parâmetros de balanceamento
+Podem mudar entre versões e, futuramente, receber override administrativo.
+
+Exemplos:
+- saldo inicial em Coins;
+- custo base de cultivo;
+- duração base;
+- multiplicadores de trabalho;
+- taxas de recuperação.
+
+### Conteúdo administrável
+Definições como trabalhos, partes visuais, itens e pacotes de loja pertencem principalmente ao sistema `Content`/`Commerce`, mesmo que o Game Admin futuramente os edite. Não transformar catálogo em `key/value` genérico de GameConfig.
 
 ---
 
-## 4. Estrutura de Configurações Exemplar
+## 4. Estratégia por Fase
+
+### MVP
+- defaults tipados e versionados no código;
+- nenhuma interface administrativa;
+- nenhuma tabela genérica de overrides necessária;
+- operações em andamento persistem snapshots dos valores que não podem mudar retroativamente.
+
+### Futuro
+Somente parâmetros marcados como `runtimeOverrideAllowed` poderão receber override persistido e auditado.
+
+---
+
+## 5. Precedência
+
+Não deve existir uma regra global onde qualquer variável de ambiente possa sobrescrever qualquer parâmetro de jogo.
+
+Separar:
+- **Configuração de infraestrutura:** `DATABASE_URL`, porta, origens, segredos etc. via ambiente.
+- **GameConfig:** valores de balanceamento definidos em código e, futuramente, overrides persistidos autorizados.
+
+Para um parâmetro de jogo elegível a override, a precedência futura é:
+
+```text
+override persistido válido
+        ↓
+default versionado no código
+```
+
+Variáveis de ambiente só participam quando uma chave específica for explicitamente projetada para isso.
+
+---
+
+## 6. Exemplo
 
 ```json
 {
   "economy": {
-    "initialBalance": 200,
-    "rewardMultiplier": 1.0
+    "initialCoins": 200
   },
   "cultivation": {
-    "baseCost": 50,
-    "baseDurationSeconds": 1800,
-    "maxActiveIncubatorsDefault": 1
+    "baseCostCoins": 50,
+    "baseDurationSeconds": 1800
   },
   "work": {
     "rewardMultiplier": 1.0,
-    "energyCostMultiplier": 1.0,
-    "baseRiskFactor": 0.05
+    "energyCostMultiplier": 1.0
   },
   "ono": {
-    "energyRecoveryRatePerHour": 20,
-    "maxBaseAttributePoints": 100
+    "energyRecoveryRatePerHour": 20
   }
 }
 ```
 
----
-
-## 5. Regras de Override e Precedência
-
-O sistema determina o valor final de uma configuração seguindo a ordem de precedência:
-1. **Override Ativo em Banco de Dados** (Ajuste administrativo mais recente).
-2. **Variável de Ambiente** (Se explicitamente declarada no servidor).
-3. **Valor Padrão em Código** (Arquivo de configuração padrão versionado no projeto).
+Os números são apenas exemplos, não valores finais de balanceamento.
 
 ---
 
-## 6. Entradas e Saídas
+## 7. Snapshots e Operações em Andamento
 
-### Entradas
-- `getConfig(keyPath)`
-- `setOverride(keyPath, value, adminUserId)`
+Mudanças no GameConfig não alteram retroativamente:
+- cultivos ativos;
+- trabalhos ativos;
+- pedidos de Commerce já criados;
+- Onos já gerados.
 
-### Saídas
-- Valor tipado da configuração solicitada.
-
----
-
-## 7. Invariantes e Segurança
-
-- Alterações em `GameConfig` via overrides são auditadas (registram quem alterou, quando e o valor anterior).
-- Validação estrita de tipos e limites (ex: `initialBalance` não pode ser negativo).
-- Parâmetros técnicos imutáveis não podem sofrer overrides em tempo de execução.
+Cada sistema persiste os valores/versões relevantes no momento em que a operação começa.
 
 ---
 
-## 8. Status
+## 8. Overrides Futuros
 
-- **Maturidade:** Planned (Parâmetros padrão em código no MVP; overrides dinâmicos para fases posteriores).
+Um override deve registrar:
+- chave;
+- valor tipado;
+- valor anterior;
+- responsável;
+- data/hora;
+- motivo opcional;
+- versão/revisão.
+
+Regras:
+- validação de tipo e faixa;
+- lista explícita de chaves editáveis;
+- constantes técnicas nunca recebem override;
+- mudanças críticas podem exigir confirmação/revisão adicional no Game Admin.
+
+---
+
+## 9. Status
+
+- **Core / MVP:** defaults tipados em código e mecanismo de snapshot.
+- **Planned:** overrides persistidos, auditoria e edição pelo Game Admin.
