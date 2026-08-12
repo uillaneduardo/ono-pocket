@@ -1,219 +1,212 @@
-# Arquitetura técnica inicial
+# Arquitetura técnica — Ono Pocket
 
 ## Objetivo
 
-Definir uma base simples, modular e testável para o Ono Pocket, adequada ao MVP e preparada para evolução incremental.
+Manter uma base simples, modular, testável e adequada ao crescimento incremental do Ono Pocket.
 
 ## Princípios
 
-- monólito modular;
-- frontend e backend claramente separados;
+- monólito modular no backend;
+- Web Client e Game Server separados como aplicações/deploys;
 - regras de negócio fora da interface;
-- banco relacional como fonte persistente;
+- servidor como autoridade de estado, tempo e economia;
+- banco relacional como persistência principal;
 - APIs explícitas;
+- conteúdo data-driven e versionado;
 - sem microserviços no MVP;
-- sem IA generativa dentro do jogo;
-- sem dependência obrigatória de serviços proprietários.
+- sem dependência obrigatória de serviços proprietários para o núcleo do jogo.
 
-## Stack inicial
+## Stack
 
-### Frontend
-
+### Web Client
 - React;
 - TypeScript;
 - Vite;
 - PWA;
-- CSS responsivo;
-- biblioteca de interface mínima.
+- CSS responsivo/Tailwind quando útil.
 
-### Backend
-
+### Game Server
 - Node.js;
 - TypeScript;
-- API REST;
+- Express/API REST;
 - Prisma ORM;
 - MySQL.
 
 ### Qualidade
-
 - ESLint;
-- verificação TypeScript;
+- TypeScript strict/verificação de tipos;
 - testes unitários;
 - testes de integração;
 - build de produção;
 - GitHub Actions.
 
-## Estrutura sugerida
+## Estado da Fundação
+
+A SPEC-001 implementou uma fundação integrada funcional. A próxima reorganização técnica deverá separar Web e API em aplicações/containers independentes antes de implementar autenticação persistente e os módulos centrais do jogo.
+
+Essa reorganização é uma mudança de aplicação/deploy, não adoção de microserviços.
+
+## Estrutura Alvo
+
+Estrutura conceitual sugerida:
 
 ```text
 apps/
 ├── web/
 └── server/
+
 packages/
 ├── domain/
+├── game-config/
 ├── ono-generator/
 ├── visual-system/
 └── shared/
-docs/
+
 prisma/
+docs/
+docker/
+compose.yml
 ```
 
-A estrutura final pode ser ajustada durante a SPEC-001, desde que preserve as responsabilidades.
+A estrutura física pode variar se mantiver responsabilidades claras e não introduzir abstrações sem necessidade.
 
 ## Responsabilidades
 
 ### `apps/web`
-
 - interface do jogador;
-- navegação;
-- estados de carregamento, vazio e erro;
+- navegação e estado visual;
+- PWA;
 - consumo da API;
-- instalação PWA;
-- renderização visual dos Onos.
-
-Não deve conter regras definitivas de geração, economia ou conclusão de tarefas.
+- renderização dos Onos;
+- sem autoridade sobre economia, geração, pagamentos ou tempo.
 
 ### `apps/server`
-
-- autenticação futura;
-- validação de entradas;
-- acesso ao banco;
-- horários confiáveis;
-- autorização;
+- autenticação/autorização;
+- API REST;
 - orquestração dos casos de uso;
-- API REST.
+- acesso ao banco;
+- relógio confiável;
+- validação;
+- regras econômicas e financeiras;
+- carregamento de configuração e conteúdo.
 
 ### `packages/domain`
+- tipos e invariantes de domínio independentes de HTTP/UI quando isso simplificar os testes.
 
-- tipos de domínio;
-- invariantes;
-- regras de cultivo;
-- regras de trabalho;
-- economia;
-- passagem do tempo.
+### `packages/game-config`
+- defaults tipados e versionados de balanceamento;
+- sem depender de interface administrativa no MVP.
 
 ### `packages/ono-generator`
-
-- gerador determinístico por seed;
-- compatibilidade entre partes;
-- geração de atributos;
-- versão do algoritmo;
+- geração determinística;
+- versionamento do algoritmo;
+- processamento de catálogo/snapshots recebidos como entrada;
 - testes determinísticos.
 
 ### `packages/visual-system`
-
-- descrição visual;
-- ordenação de camadas;
-- fallback de animações;
-- validação lógica de composição.
+- composição visual;
+- ordem de camadas;
+- fallbacks;
+- validações de manifesto visual.
 
 ### `packages/shared`
+- contratos compartilhados e utilitários realmente genéricos;
+- não deve virar um depósito de regras de negócio.
 
-- contratos compartilhados;
-- schemas de validação;
-- utilitários sem regra de negócio específica.
+## Deploy Inicial
 
-## Comunicação
+Cenário alvo no homelab:
 
-O frontend se comunica com o backend por HTTP usando JSON.
+```text
+Cloudflare / Tunnel
+      │
+      ├── ono.<dominio>
+      │       ↓
+      │   Web Container
+      │
+      └── api.ono.<dominio>
+              ↓
+          API Container
+              ↓
+            MySQL
+```
 
-A API deve retornar:
+O banco pode ser remoto ou local. Somente a API o acessa.
 
-- código HTTP apropriado;
-- corpo consistente;
-- mensagem segura para o usuário;
-- identificador técnico de erro quando necessário.
+Nenhuma regra do jogo depende do hostname atual. `VITE_API_URL`, origens permitidas e demais endereços são configurados por ambiente.
 
-## Persistência
+## Comunicação Web/API
 
-O MySQL será usado para:
+- HTTPS + JSON;
+- erros com formato consistente;
+- CORS explícito;
+- autenticação projetada considerando hosts/subdomínios distintos;
+- operações sensíveis nunca são confirmadas apenas pelo cliente.
 
-- contas;
-- laboratórios;
-- cultivos;
-- Onos;
-- composições visuais;
-- trabalhos;
-- saldo;
-- histórico relevante.
+## Persistência e Transações
 
-Alterações de estrutura devem usar migrations do Prisma.
+MySQL/Prisma será usado para dados persistentes.
 
-Migrations já aplicadas não devem ser editadas.
+Migrations:
+- são versionadas;
+- migrations aplicadas não são editadas retroativamente;
+- novos sistemas só criam tabelas quando sua SPEC for implementada;
+- não antecipar colunas/tabelas para sistemas futuros.
+
+Operações que combinam mudanças de estado e economia devem usar transação/garantia de idempotência apropriada.
 
 ## Tempo
 
-Operações importantes devem usar horário do servidor.
+O servidor é autoridade do tempo.
 
-Não haverá atualização contínua de cada Ono. O sistema armazenará horários relevantes e calculará o estado quando o dado for consultado ou uma ação for executada.
-
-Isso se aplica a:
-
-- cultivo;
-- trabalhos;
-- energia;
-- recompensas;
-- progressão temporal.
+Cultivos e trabalhos armazenam `startedAt`/`endsAt` e snapshots necessários. O estado é calculado quando consultado/resolvido; não existe processo contínuo individual por Ono.
 
 ## Segurança
 
-- segredos apenas em variáveis de ambiente;
-- `.env.example` sem credenciais;
-- validação no backend;
-- senhas nunca armazenadas em texto puro;
-- uploads futuros com validação de MIME, tamanho e nome;
-- autorização por proprietário do recurso;
-- logs sem tokens ou credenciais.
+- segredos apenas no backend/variáveis de ambiente;
+- `.env.example` nunca contém credenciais reais;
+- validação de entrada;
+- autorização por proprietário/recurso;
+- senhas com hash apropriado;
+- logs sem tokens, senhas ou segredos;
+- uploads/mods futuros com validação de MIME, tamanho, caminho e schema;
+- cliente e Game Admin nunca acessam banco diretamente.
 
 ## PWA
 
-A aplicação deve possuir:
-
-- manifesto;
-- ícones provisórios;
+- manifesto e ícones;
 - service worker;
-- shell básico em cache;
-- comportamento seguro quando offline;
-- detecção de atualização disponível.
+- shell/offline seguro;
+- operações econômicas, temporais e financeiras aguardam servidor;
+- cache nunca simula sucesso de operações sensíveis.
 
-O MVP não deve simular sucesso de operações financeiras ou temporais enquanto offline. Ações sensíveis devem aguardar conexão com o servidor.
-
-## Configuração
-
-A configuração deve ser lida de variáveis de ambiente e validada na inicialização.
-
-Exemplos:
-
-- URL do banco;
-- porta da API;
-- origem permitida do frontend;
-- ambiente;
-- segredos de autenticação futuros.
-
-## Observabilidade inicial
-
-No MVP, bastam:
+## Observabilidade Inicial
 
 - logs estruturados simples;
 - endpoint de saúde;
-- mensagens claras de inicialização;
-- tratamento global de erros.
+- mensagens de inicialização;
+- tratamento global de erros;
+- métricas avançadas apenas quando houver necessidade.
 
 ## Restrições
 
-Não adotar na fundação:
-
+Não adotar sem necessidade comprovada:
 - microserviços;
+- Redis;
 - filas distribuídas;
+- RabbitMQ/Kafka;
 - Kubernetes;
-- Redis sem necessidade comprovada;
+- Elasticsearch;
 - GraphQL;
 - event sourcing;
-- arquitetura excessivamente abstrata.
+- abstrações genéricas excessivas.
 
-## Evolução
+## Documentação de Sistemas
 
-Para o detalhamento completo dos sistemas modulares de domínio (Account, Player, GameConfig, Ono, OnoGenerator, Cultivation, Laboratory, Work, Economy, Commerce, Content, Mods e Sistemas Futuros), consulte a documentação detalhada em `docs/systems/`:
-- [Visão Geral dos Sistemas (`docs/systems/SYSTEM_OVERVIEW.md`)](../docs/systems/SYSTEM_OVERVIEW.md)
+A fonte de verdade para as fronteiras dos sistemas está em:
 
-Novos sistemas devem ser implementados por especificações numeradas, uma de cada vez, preservando compatibilidade com os documentos de produto, domínio e arquitetura dos sistemas.
+- [`docs/systems/SYSTEM_OVERVIEW.md`](../docs/systems/SYSTEM_OVERVIEW.md)
+
+Documentos individuais em `docs/systems/` detalham Account/Player, GameConfig, Ono, OnoGenerator, Cultivation, Laboratory, Work, Economy, Commerce, Content, Mods e sistemas futuros.
+
+Novas funcionalidades devem ser implementadas por SPECs numeradas, uma de cada vez, e revisadas contra esses contratos antes do merge.
