@@ -2,65 +2,103 @@
 
 ## 1. Objetivo
 
-Documentar as fronteiras, responsabilidades esperadas e limites dos sistemas futuros e experimentais do Ono Pocket, garantindo que o núcleo técnico atual não crie impedimentos ou decisões conflitantes para desenvolvimentos futuros.
+Documentar responsabilidades esperadas e limites dos sistemas futuros sem antecipar código, tabelas ou dependências no núcleo atual.
 
 ---
 
-## 2. Visão Geral dos Sistemas Futuros
+## 2. Regra Geral
 
-Estes sistemas são categorizados como **Future / Experimental**. Suas especificações detalhadas e códigos **NÃO** fazem parte do MVP nem da fundação técnica imediata.
+Estes sistemas são **Future / Experimental**. Só devem receber implementação após:
+- o ciclo principal do jogo estar validado;
+- existir uma SPEC dedicada;
+- a necessidade estar clara;
+- a implementação não exigir acoplamento prematuro em módulos atuais.
 
----
-
-## 3. Delimitação das Fronteiras e Responsabilidades
-
-### 3.1. Game Admin (Painel Administrativo)
-- **Responsabilidades:**
-  - Interface web de gestão para administradores do jogo.
-  - Monitoramento de contas (`Accounts`), jogadores (`Players`), movimentações financeiras e métricas de desempenho.
-  - Gestão de overrides do `GameConfig`, ativação/desativação de mods e catálogo de loja.
-  - Auditoria de segurança e tratamento de suporte a pagamentos.
-- **Fronteira Arquitetural:**
-  - O Game Admin é um cliente consumidor da API REST (`admin.ono.example.com`).
-  - **Nunca** acerta ou manipula o banco de dados diretamente via SQL do frontend. Todas as ações passam por rotas REST administrativas autenticadas com tokens de privilégio elevado.
-
-### 3.2. World & Maps (Mundo e Mapas)
-- **Responsabilidades:**
-  - Apresentar regiões geográficas do universo de Ono Pocket.
-  - Definir ecossistemas locais que influenciam quais oportunidades de trabalho ou linhagens de Onos estão disponíveis por região.
-  - Navegação de mapas e deslocamentos no cliente.
-- **Fronteira Arquitetural:**
-  - A navegação em mapas é puramente visual e orientada a dados no frontend.
-  - O tempo de deslocamento ou requisitos regionais são validados de forma centralizada pelo `Game Server`.
-
-### 3.3. Events (Sistema de Eventos Temporais)
-- **Responsabilidades:**
-  - Gerenciar eventos globais ou sazonais no jogo (ex: festival de biotecnologia, tempestades ambientais).
-  - Aplicar modificadores temporários de trabalho ou cultivo (ex: +20% recompensa em monitoramento ambiental por 48 horas).
-- **Fronteira Arquitetural:**
-  - Eventos são expostos como overrides temporários de dados no `GameConfig` ou parâmetros no sistema `Content`.
-
-### 3.4. Story (Progresso Narrativo)
-- **Responsabilidades:**
-  - Apresentar diálogos, descobertas de lore e conquistas narrativas conforme o jogador evolui seu laboratório.
-- **Fronteira Arquitetural:**
-  - Árvores de diálogos e textos narrativos são entregues via `Content` como arquivos JSON declarativos sem lógica executável no cliente.
-
-### 3.5. Combat (Enfrentamentos / Desafios Biológicos)
-- **Responsabilidades:**
-  - Sistema opcional de desafios ou simulações táticas entre Onos ou contra ameaças ambientais.
-- **Fronteira Arquitetural:**
-  - O combate (se futuramente implementado) será estritamente baseado em simulação calculada no servidor com base nos atributos do Ono, sem transformar o jogo em um MMO em tempo real.
+Não amarrar essa decisão a números específicos de SPEC, pois a ordem de evolução pode mudar.
 
 ---
 
-## 4. Invariantes de Isolamento dos Sistemas Futuros
+## 3. Game Admin
 
-1. **Sem Adição Prematura:** Nenhum código, tabela ou rota para esses sistemas deve ser criada no repositório até que o ciclo principal (SPEC-001, SPEC-002, SPEC-003) esteja totalmente validado e em produção.
-2. **Preservação do Núcleo:** O modelo de dados do Ono, Cultivo e Trabalho deve permanecer simples e testável, sem colunas nulas ou campos antecipados destinados a sistemas futuros não implementados.
+### Responsabilidades futuras
+- gestão de contas e jogadores;
+- consulta/auditoria de Onos;
+- edição de parâmetros permitidos de GameConfig;
+- gestão de conteúdo oficial;
+- gestão de mods aprovados;
+- monitoramento de Economy e Commerce;
+- suporte a pagamentos;
+- estatísticas e gráficos.
+
+### Fronteira
+- cliente administrativo separado;
+- consome API administrativa autenticada;
+- nunca acessa MySQL diretamente pelo frontend;
+- permissões administrativas são diferentes das permissões de jogador;
+- operações críticas precisam de auditoria.
 
 ---
 
-## 5. Status
+## 4. World & Maps
 
-- **Maturidade:** Future / Experimental (Documentação conceitual de fronteiras).
+### Responsabilidades futuras
+- regiões e localizações;
+- navegação;
+- disponibilidade regional de conteúdo;
+- condições ambientais e deslocamento quando houver mecânica concreta.
+
+### Fronteira
+O mapa pode ser renderizado no cliente, mas regras de desbloqueio, deslocamento, custos e efeitos persistentes pertencem ao servidor.
+
+---
+
+## 5. Events
+
+### Responsabilidades futuras
+- eventos globais, sazonais ou pessoais;
+- ativação temporária de conteúdo/modificadores;
+- gatilhos que possam afetar Work, World ou Story.
+
+### Fronteira
+Events não deve transformar GameConfig em um saco genérico de estados temporários. Eventos podem consumir regras de Content e produzir modificadores explicitamente modelados/versionados.
+
+---
+
+## 6. Story
+
+### Responsabilidades futuras
+- progressão narrativa;
+- diálogos e escolhas;
+- descoberta de lore;
+- desbloqueios narrativos.
+
+### Fronteira
+Conteúdo narrativo pode ser declarativo, mas consequências persistentes e validação de escolhas pertencem ao servidor.
+
+---
+
+## 7. Combat
+
+### Responsabilidades futuras
+- desafios táticos ou simulações baseadas nas características dos Onos.
+
+### Fronteira
+- resolução autoritativa no servidor;
+- reutilizar atributos/partes existentes quando adequado, evitando criar um segundo modelo incompatível de Ono;
+- não assumir MMO em tempo real;
+- modo, PvE/PvP e regras só serão definidos quando a mecânica for planejada.
+
+---
+
+## 8. Invariantes para o Núcleo Atual
+
+1. Não criar tabelas, campos nulos, rotas ou serviços “reservados” para sistemas futuros.
+2. IDs e modelos atuais devem ser extensíveis sem tentar prever todos os usos futuros.
+3. Ono, Cultivation, Work, Economy e Content devem permanecer independentes de World/Story/Combat enquanto esses sistemas não existirem.
+4. Funcionalidades futuras entram através de interfaces/casos de uso explícitos, não por condicionais espalhadas pelo núcleo.
+
+---
+
+## 9. Status
+
+- **Maturidade:** Future / Experimental.
