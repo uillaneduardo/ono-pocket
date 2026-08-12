@@ -213,4 +213,7 @@ Não adotar na fundação:
 
 ## Evolução
 
-Novos sistemas devem ser implementados por especificações numeradas, uma de cada vez, preservando compatibilidade com os documentos de produto e domínio.
+Para o detalhamento completo dos sistemas modulares de domínio (Account, Player, GameConfig, Ono, OnoGenerator, Cultivation, Laboratory, Work, Economy, Commerce, Content, Mods e Sistemas Futuros), consulte a documentação detalhada em `docs/systems/`:
+- [Visão Geral dos Sistemas (`docs/systems/SYSTEM_OVERVIEW.md`)](../docs/systems/SYSTEM_OVERVIEW.md)
+
+Novos sistemas devem ser implementados por especificações numeradas, uma de cada vez, preservando compatibilidade com os documentos de produto, domínio e arquitetura dos sistemas.
