@@ -2,7 +2,7 @@
 
 O **Ono Pocket** é um jogo PWA de simulação, cultivo e trabalho com criaturas biológicas modulares chamadas **Onos**.
 
-O projeto será desenvolvido de forma simples, incremental e orientada por documentação. O objetivo inicial é validar um ciclo de jogo curto e consistente antes de adicionar sistemas mais complexos.
+O projeto é desenvolvido de forma simples, incremental e orientada por documentação. O objetivo inicial é validar um ciclo de jogo curto e consistente antes de adicionar sistemas mais complexos.
 
 ## Conceito
 
@@ -27,44 +27,88 @@ O jogador administra um pequeno laboratório onde pode cultivar Onos gerados pro
 - **Testabilidade:** regras de negócio devem ser independentes da interface.
 - **Consistência:** toda implementação deve seguir a documentação oficial do repositório.
 
-## Escopo inicial
-
-O MVP será concentrado em três áreas:
-
-- **Gerador procedural:** criação determinística de Onos com partes e atributos compatíveis.
-- **Laboratório:** cultivo, incubadoras, habitats e registro dos Onos.
-- **Trabalho:** oportunidades, duração, cálculo de resultado, experiência e pagamento.
-
-Funcionalidades como combate, reprodução, exploração de mundo, comércio entre jogadores e recursos sociais não fazem parte do MVP inicial.
-
-## Organização planejada
+## Estrutura do Projeto
 
 ```text
-ai/                 Instruções para agentes de IA
-product/            Visão, escopo e ciclo do produto
-game-design/        Regras de geração, cultivo e trabalho
-visual-system/      Sistema modular de aparência e animações
-technical/          Arquitetura, banco, segurança e testes
-interface/          Arquitetura da informação e telas
-specifications/     Especificações implementáveis
- decisions/         Registros de decisões arquiteturais
+├── .github/workflows/   Workflows do GitHub Actions (CI)
+├── docs/architecture/  Registros de Decisão Arquitetural (ADR)
+├── prisma/             Schema e migrations do Prisma ORM (MySQL)
+├── public/             Assets estáticos do PWA (manifest, sw, ícones)
+├── src/
+│   ├── client/         Frontend React + Vite + Tailwind CSS
+│   └── server/         Backend Node.js + Express REST API
+├── tests/              Testes automatizados com Vitest
+├── .env.example        Exemplo de variáveis de ambiente
+├── eslint.config.js    Configuração do ESLint
+└── vite.config.ts      Configuração do Vite
 ```
 
-## Processo de desenvolvimento
+## Como Executar
 
-Cada funcionalidade deve seguir este fluxo:
+### Pré-requisitos
+- Node.js 20+
+- npm 10+
 
-```text
-Documentação
-→ Especificação
-→ Implementação
-→ Testes
-→ Revisão
-→ Validação
+### Instalação
+```bash
+git clone https://github.com/uillaneduardo/ono-pocket.git
+cd ono-pocket
+npm install
 ```
 
-O Google AI Studio poderá ser utilizado para gerar e alterar o código, mas deverá respeitar os documentos deste repositório como fonte oficial do projeto.
+### Desenvolvimento
+O comando principal para desenvolvimento é:
+```bash
+# Inicia a aplicação integrada (Backend Express + Frontend Vite na porta 3000)
+npm run dev
+```
+> **Como funciona:** O script `npm run dev` executa o servidor Node.js/Express (`src/server/index.ts`) em modo watch com `tsx`. Em modo de desenvolvimento, o Express carrega o middleware do Vite (`vite.createServer`), processando o frontend React/Vite e servindo as rotas `/api/*` da REST API simultaneamente na mesma porta (3000).
 
-## Estado atual
+Também estão disponíveis scripts individuais de desenvolvimento:
+```bash
+# Executa apenas o servidor backend Express
+npm run dev:server
 
-Projeto em fase de documentação e definição do MVP.
+# Executa apenas o servidor Vite para o frontend
+npm run dev:web
+```
+
+### Banco de Dados (Prisma ORM)
+```bash
+# Gera o cliente do Prisma ORM
+npm run db:generate
+
+# Executa as migrações do banco em desenvolvimento
+npm run db:migrate
+```
+
+### Testes Automatizados
+```bash
+# Executa os testes unitários com Vitest
+npm run test
+
+# Executa os testes de integração com Vitest
+npm run test:integration
+```
+
+### Linter & Checagem de Tipos
+```bash
+# Checagem de linting
+npm run lint
+
+# Checagem de tipos TypeScript
+npm run typecheck
+```
+
+### Build para Produção
+```bash
+# Gera cliente estático e compila servidor Node.js em dist/
+npm run build
+
+# Executa servidor em produção
+npm start
+```
+
+## Estado Atual
+
+- **SPEC-001 — Project Foundation**: Concluído com sucesso (Frontend React + TS + Vite, Backend REST Node.js + Express, Prisma ORM MySQL, Vitest, PWA e GitHub Actions CI).

@@ -1,0 +1,16 @@
+// Prisma Schema for Ono Pocket
+// Database Provider: MySQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Placeholder model required for Prisma Client generation
+model FoundationPlaceholder {
+  id String @id @default(uuid())
+}
