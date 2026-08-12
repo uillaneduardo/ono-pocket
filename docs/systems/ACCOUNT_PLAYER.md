@@ -2,115 +2,114 @@
 
 ## 1. Objetivo
 
-Separar conceitualmente a identidade de acesso do usuário (**Account**) da representação da pessoa e do progresso dentro do jogo (**Player**).
+Separar a identidade de acesso (**Account**) da representação e progresso dentro do jogo (**Player**).
 
 ---
 
 ## 2. Responsabilidades
 
-### 2.1. Account (Identidade & Acesso)
-- Autenticação e validação de credenciais de acesso.
-- Gestão de sessões ativas e tokens de acesso (JWT / Cookies de Sessão).
-- Configurações globais da conta (email, senha, preferências de segurança, status da conta).
-- Proteção da identidade técnica do usuário.
+### Account
+- cadastro e identidade técnica;
+- autenticação de credenciais;
+- sessões;
+- estado da conta;
+- preferências de segurança;
+- futuras verificações e recuperação de acesso.
 
-### 2.2. Player (Perfil de Jogo & Progressão)
-- Representação do jogador dentro do universo do Ono Pocket.
-- Vínculo com os Onos pertencentes ao jogador.
-- Estado da instalação do Laboratório e Habitats.
-- Gestão do inventário futuro de recursos e insumos.
-- Acompanhamento da progressão do jogador e conquistas/histórico.
+### Player
+- perfil visível dentro do jogo;
+- vínculo com Onos;
+- laboratório;
+- inventário futuro;
+- progressão e histórico do jogador.
+
+As regras de jogo dependem de `playerId` e não de detalhes de autenticação.
 
 ---
 
-## 3. Entidades de Domínio
+## 3. Entidades Conceituais
 
 ### Account
-- `id`: UUID (Chave primária).
-- `email`: String única.
-- `passwordHash`: String contendo o hash seguro da senha (Argon2 / bcrypt).
-- `status`: Enum (`active`, `suspended`, `pending_verification`).
+- `id`: UUID.
+- `email`: String única normalizada.
+- `passwordHash`: hash seguro.
+- `status`: Enum (`active`, `suspended`, `pending_verification` quando aplicável).
 - `createdAt`: DateTime.
 - `updatedAt`: DateTime.
 
 ### Player
-- `id`: UUID (Chave primária).
-- `accountId`: UUID (Chave estrangeira apontando para `Account`, relação 1:1).
-- `displayName`: String (Nome visível do cultivador/jogador).
-- `level`: Integer (Nível de experiência do jogador/laboratório).
+- `id`: UUID.
+- `accountId`: UUID único, relação 1:1.
+- `displayName`: String.
+- campos de progressão apenas quando houver função documentada.
 - `createdAt`: DateTime.
 - `updatedAt`: DateTime.
 
----
-
-## 4. Estados
-
-### Account States
-- **unauthenticated:** Usuário sem sessão ativa.
-- **authenticated:** Usuário com credenciais validadas e sessão ativa.
-- **suspended:** Conta bloqueada por questões de segurança ou violação de regras.
+Não adicionar `level` genérico apenas por convenção. Caso exista nível de jogador/laboratório, sua função e progressão devem ser definidas em SPEC própria.
 
 ---
 
-## 5. Entradas e Saídas
+## 4. Regras e Invariantes
 
-### Entradas (Ações da API)
+1. Cada Account possui no máximo um Player; no fluxo normal de criação, Account e Player devem resultar em uma associação 1:1 válida.
+2. Recursos pertencentes ao jogador são autorizados por `playerId` obtido da sessão autenticada, nunca por um `playerId` arbitrário confiado do cliente.
+3. Senhas nunca são armazenadas em texto puro.
+4. Dados sensíveis da Account não são expostos em DTOs de Player.
+5. Suspensão de Account impede novas ações autenticadas conforme política definida pelo servidor.
+6. Criação de Account/Player deve ser consistente: falha parcial não pode deixar uma conta utilizável sem o estado mínimo exigido pelo jogo.
+
+---
+
+## 5. Sessões
+
+A implementação exata será definida na SPEC de Account/Player considerando que Web e API utilizam subdomínios/hosts separados.
+
+Diretrizes:
+- preferir credencial de sessão protegida por cookie `HttpOnly` + `Secure` quando compatível com o modelo final de deploy;
+- não armazenar token de longa duração em `localStorage` por padrão;
+- CORS, `SameSite`, domínio/path do cookie e CSRF devem ser tratados explicitamente;
+- sessões devem ser revogáveis e possuir expiração;
+- segredos de assinatura/chaves permanecem apenas no backend.
+
+Não fixar JWT como requisito arquitetural. JWT pode ser usado internamente se houver justificativa, mas não deve surgir apenas por padrão de framework.
+
+---
+
+## 6. Entradas Conceituais
+
 - `registerAccount(email, password, displayName)`
 - `login(email, password)`
-- `logout(sessionId)`
-- `updatePlayerProfile(playerId, data)`
+- `logout(currentSession)`
+- `getCurrentPlayer()`
+- `updatePlayerProfile(data)`
 
-### Saídas
-- Tokens/Sessões de autenticação válidos.
-- Perfil do Jogador (`PlayerProfileDTO`).
-
----
-
-## 6. Regras e Invariantes
-
-1. **Relação 1:1 Rigorosa:** Toda `Account` possui exatamente um perfil de `Player` associado.
-2. **Isolamento de Dados:** Um `Player` só pode visualizar e manipular os Onos, Incubadoras e Recursos associados ao seu próprio `playerId`.
-3. **Senhas Seguras:** Nenhuma senha ou credencial é armazenada em texto puro.
-4. **Desacoplamento de Domínio:** Lógicas do jogo (trabalhos, cultivos) dependem exclusivamente do `playerId`, e nunca de detalhes da `Account`.
+A API não deve exigir que o cliente informe o próprio `playerId` para operações que podem derivá-lo da sessão.
 
 ---
 
-## 7. Eventos Produzidos
+## 7. Segurança
 
-- `AccountRegistered(accountId, email)`
-- `PlayerCreated(playerId, accountId, displayName)`
-- `PlayerLoggedIn(accountId, timestamp)`
-
----
-
-## 8. Dependências
-
-- **Banco de Dados Relacional:** Tabela `accounts` e `players` no MySQL via Prisma.
-- **Serviço de Criptografia:** Utilitários de hash e assinatura de tokens no backend Node.js.
+- hash de senha com algoritmo apropriado e parâmetros atualizados;
+- rate limiting/defesas contra abuso nos endpoints de autenticação;
+- mensagens de erro que não revelem informação sensível desnecessária;
+- cookies/tokens não registrados em logs;
+- validação e normalização de email;
+- proteção contra enumeração de contas quando aplicável;
+- autorização sempre no backend.
 
 ---
 
-## 9. Parâmetros Configuráveis
+## 8. Eventos Conceituais
 
-- `auth.tokenExpirationTime`: Tempo de expiração da sessão (ex: 7 dias).
-- `auth.minPasswordLength`: Tamanho mínimo da senha (ex: 8 caracteres).
+- `AccountRegistered(accountId)`
+- `PlayerCreated(playerId, accountId)`
+- eventos de auditoria de sessão quando úteis.
 
----
-
-## 10. Segurança
-
-- **Segredos no Servidor:** As chaves de assinatura de token permanecem exclusivas no backend via variáveis de ambiente (`JWT_SECRET`).
-- **Sanitização de Dados:** Respostas de API nunca contêm `passwordHash` ou dados sensíveis da conta.
+Evitar incluir email/sensíveis em eventos/logs sem necessidade.
 
 ---
 
-## 11. Fora do Escopo
+## 9. Status
 
-- Login via redes sociais (OAuth de terceiros) nesta fase inicial.
-- Múltiplos perfis de jogador por conta.
-
----
-
-## 12. Status
-
-- **Maturidade:** Planned (Agendado para implementação formal na SPEC-002).
+- **Maturidade:** Core / MVP.
+- A implementação deve ocorrer somente após a fundação de deploy Web/API estar definida, pois isso influencia sessão, CORS e cookies.
