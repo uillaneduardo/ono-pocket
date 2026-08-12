@@ -2,56 +2,121 @@
 
 ## 1. Objetivo
 
-Gerenciar o envio de Onos para atividades de trabalho, calculando a aptidão da criatura, o tempo de execução, os resultados, as recompensas econômicas e o desgaste biológico.
+Gerenciar o envio de Onos para atividades de trabalho, calculando aptidão, tempo, resultado, recompensa e desgaste com autoridade do servidor e preservação histórica das regras utilizadas.
 
 ---
 
 ## 2. Responsabilidades
 
-- Oferecer oportunidades de trabalho ativas aos jogadores.
-- Validar se um Ono atende aos requisitos mínimos para ser designado a uma tarefa.
-- Calcular a taxa de aptidão com base nos atributos, predisposições, componentes visuais e estado atual do Ono.
-- Controlar o tempo da atividade e resolver o resultado de forma idempotente e atômica.
-- Aplicar o desgaste (consumo de energia, acréscimo de estresse) e creditar moedas (`Coins`) e experiência.
+- Expor oportunidades de trabalho válidas a partir do sistema `Content`.
+- Validar propriedade, disponibilidade e requisitos do Ono.
+- Calcular aptidão usando atributos, predisposições, componentes relevantes e condições temporárias.
+- Congelar as regras necessárias no início da atribuição para que mudanças posteriores de conteúdo/configuração não alterem um trabalho em andamento.
+- Resolver o resultado de forma idempotente.
+- Aplicar desgaste/condições.
+- Solicitar à `Economy` a concessão de Coins.
+- Registrar um relatório persistente do resultado.
 
 ---
 
-## 3. Entidades e Tipos de Trabalho
+## 3. Conteúdo Inicial
 
-### Oportunidades Iniciais do MVP
-1. **Transporte de Materiais:** Favorece Força, Resistência e Energia.
-2. **Inspeção de Estruturas:** Favorece Sensibilidade, Mobilidade e Cognição.
-3. **Limpeza Técnica:** Favorece Mobilidade, Autonomia e Resistência.
-4. **Monitoramento Ambiental:** Favorece Sensibilidade, Autonomia e Cognição.
+O MVP pode iniciar com:
+1. transporte de materiais;
+2. inspeção de estruturas;
+3. limpeza técnica;
+4. monitoramento ambiental.
 
-### Entidades
-- `WorkOpportunity`: Oportunidade declarativa (tipo, requisitos, duração, pagamento base, risco, desgaste).
-- `WorkAssignment`: Atribuição de um Ono a uma oportunidade (`onoId`, `playerId`, `startedAt`, `endsAt`, `status`).
-- `WorkResult`: Resultado calculado (`classification`: `excellent`, `success`, `partial`, `failed`, `coinsEarned`, `xpEarned`, `energyConsumed`).
+Os valores concretos pertencem a `WorkDefinition`/`GameConfig`, não a condicionais hardcoded na engine.
 
 ---
 
-## 4. Cálculo de Aptidão e Resolução Determinística
+## 4. Entidades
 
-$$\text{Aptidão} = f(\text{Atributos Relevantes}, \text{Predisposições}, \text{Componentes Visuais}, \text{Condições Temporárias})$$
+### WorkOpportunity / WorkDefinition
+Definição declarativa versionada contendo, conforme necessário:
+- `id` estável;
+- `version`/`contentVersion`;
+- requisitos;
+- duração;
+- atributos desejáveis e pesos;
+- risco;
+- desgaste;
+- recompensa base/política econômica permitida.
 
-- O resultado do trabalho combina a aptidão calculada com um fator pseudoaleatório gerado pela seed da atribuição.
-- **Classificações:**
-  - **Excelente (120% recompensa):** Desempenho superior, desgaste normal.
-  - **Sucesso (100% recompensa):** Desempenho padrão.
-  - **Parcial (50% recompensa):** Recompensa reduzida por incompatibilidade ou desgaste alto.
-  - **Falha (0% recompensa principal):** Sem recompensa, desgaste/estresse aplicado.
+### WorkAssignment
+- `id`: UUID.
+- `onoId`: UUID.
+- `playerId`: UUID.
+- `workDefinitionId`: String.
+- `workDefinitionVersion`: String/hash.
+- `startedAt`: DateTime.
+- `endsAt`: DateTime.
+- `status`: Enum (`active`, `ready`, `completed`, `cancelled`, `failed`).
+- `resolutionSeed`: String.
+- snapshots mínimos de duração, regras e modificadores relevantes.
+
+### WorkResult
+- `assignmentId`: UUID único.
+- `classification`: Enum (`excellent`, `success`, `partial`, `failed`).
+- `coinsEarned`: Integer.
+- `xpEarned`: Integer.
+- alterações de condição aplicadas;
+- dados resumidos da resolução para relatório/auditoria.
 
 ---
 
-## 5. Regras e Invariantes
+## 5. Aptidão e Resolução
 
-1. **Incompatibilidade Temporal:** Enquanto um Ono estiver em `WorkAssignment` ativo (`status = active`), ele não pode aceitar outro trabalho ou ser colocado em cultivo.
-2. **Resolução Idempotente:** A resolução de um trabalho concluído só atribui moedas e experiência uma única vez (`WorkResult` único e transacional).
-3. **Validação Estrita no Backend:** Toda a fórmula de aptidão e distribuição de recompensas reside exclusivamente no backend.
+A fórmula exata será definida pela SPEC de Work, mas conceitualmente:
+
+```text
+aptidão = f(
+  atributos relevantes,
+  predisposições,
+  características funcionais,
+  condições temporárias,
+  experiência/modificadores permitidos
+)
+```
+
+A variação pseudoaleatória usa `resolutionSeed` persistida para que a resolução seja reproduzível e idempotente.
+
+Classificações iniciais podem corresponder a faixas de recompensa, mas percentuais como 120%, 100% ou 50% são parâmetros de balanceamento e não invariantes arquiteturais.
 
 ---
 
-## 6. Status
+## 6. Regras e Invariantes
+
+1. **Propriedade:** o Ono pertence ao jogador que cria a atribuição.
+2. **Disponibilidade:** o Ono não possui outra atividade mutuamente exclusiva ativa.
+3. **Condição mínima:** saúde, energia e demais limiares são validados conforme regras versionadas/configuradas.
+4. **Servidor controla o tempo:** conclusão depende de `endsAt` e `serverNow`.
+5. **Snapshot no início:** uma alteração posterior de `WorkDefinition`, mod ou `GameConfig` não muda uma atribuição já iniciada.
+6. **Resolução idempotente:** um `WorkAssignment` produz no máximo um `WorkResult` efetivo e uma concessão econômica correspondente.
+7. **Economy é a única fronteira de saldo:** Work nunca altera carteira diretamente.
+8. **Conteúdo não concede moeda por si só:** valores declarados são entradas para regras validadas pelo servidor; o motor econômico decide a concessão efetiva.
+
+---
+
+## 7. Relação com Mods
+
+Trabalhos de mods utilizam os mesmos schemas declarativos, mas no servidor oficial recompensas e riscos podem ser limitados/normalizados por políticas da Economy/GameConfig e podem exigir aprovação administrativa.
+
+Um mod nunca recebe acesso ao serviço de Economy nem cria transações diretamente.
+
+---
+
+## 8. Eventos Produzidos
+
+- `WorkAssignmentStarted(assignmentId, playerId, onoId, endsAt)`
+- `WorkAssignmentReady(assignmentId)` quando útil para notificações.
+- `WorkAssignmentCompleted(assignmentId, resultId)`
+
+Esses eventos são conceituais e não exigem broker de mensagens.
+
+---
+
+## 9. Status
 
 - **Maturidade:** Core / MVP.
