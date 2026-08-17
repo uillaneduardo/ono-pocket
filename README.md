@@ -27,20 +27,26 @@ O jogador administra um pequeno laboratório onde pode cultivar Onos gerados pro
 - **Testabilidade:** regras de negócio devem ser independentes da interface.
 - **Consistência:** toda implementação deve seguir a documentação oficial do repositório.
 
+## Documentação
+
+- [Design System v0.1](docs/design-system/README.md) — linguagem visual, tokens, componentes, padrões, motion, telas e fluxos.
+- [Wiki HTML do Design System](docs/design-system/index.html) — versão navegável da documentação visual.
+
 ## Estrutura do Projeto
 
 ```text
-├── .github/workflows/   Workflows do GitHub Actions (CI)
-├── docs/architecture/  Registros de Decisão Arquitetural (ADR)
-├── prisma/             Schema e migrations do Prisma ORM (MySQL)
-├── public/             Assets estáticos do PWA (manifest, sw, ícones)
+├── .github/workflows/       Workflows do GitHub Actions (CI)
+├── docs/architecture/      Registros de Decisão Arquitetural (ADR)
+├── docs/design-system/     Wiki e tokens do Design System do Ono Pocket
+├── prisma/                 Schema e migrations do Prisma ORM (MySQL)
+├── public/                 Assets estáticos do PWA (manifest, sw, ícones)
 ├── src/
-│   ├── client/         Frontend React + Vite + Tailwind CSS
-│   └── server/         Backend Node.js + Express REST API
-├── tests/              Testes automatizados com Vitest
-├── .env.example        Exemplo de variáveis de ambiente
-├── eslint.config.js    Configuração do ESLint
-└── vite.config.ts      Configuração do Vite
+│   ├── client/             Frontend React + Vite + Tailwind CSS
+│   └── server/             Backend Node.js + Express REST API
+├── tests/                  Testes automatizados com Vitest
+├── .env.example            Exemplo de variáveis de ambiente
+├── eslint.config.js        Configuração do ESLint
+└── vite.config.ts          Configuração do Vite
 ```
 
 ## Como Executar
